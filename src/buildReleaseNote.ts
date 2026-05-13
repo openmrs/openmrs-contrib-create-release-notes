@@ -11,7 +11,7 @@ export function buildReleaseNote(template: string, commit: Commit): string {
             value = commit[replacer as keyof Commit] ?? ''
             if (value) {
                 const placeholder = match[0]
-                result = result.replace(placeholder, value)
+                result = result.replace(placeholder, () => value)
                 break
             }
         }

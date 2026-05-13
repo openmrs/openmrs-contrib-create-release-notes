@@ -2,7 +2,7 @@
 
 This action compiles the commits between the latest release tag and a head ref into release notes. For use with [actions/create-release](https://github.com/actions/create-release).
 
--   If no release tags exist, only the `head-ref` commit will be compiled.
+- If no release tags exist, only the `head-ref` commit will be compiled.
 
 ## Inputs
 
@@ -44,7 +44,7 @@ Multi-lined release notes e.g.
 ## Example usage
 
 ```yaml
-- uses: johnyherangi/create-release-notes@main
+- uses: https://github.com/openmrs/openmrs-contrib-create-release-notes@main
   id: create-release-notes
   env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

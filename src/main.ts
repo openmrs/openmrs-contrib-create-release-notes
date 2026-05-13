@@ -16,56 +16,46 @@ async function main() {
         const github = getOctokit(process.env.GITHUB_TOKEN)
         const { owner, repo } = context.repo
 
-        return github.repos
-            .getLatestRelease({ owner, repo })
-            .then(
-                (release) =>
-                    github.request('GET /repos/:owner/:repo/compare/:baseRef...:headRef', {
+        const commits: ApiCommit[] = await github.rest.repos.getLatestRelease({ owner, repo }).then(
+            (release) => {
+                baseRef = release.data.tag_name
+                return github.rest.repos
+                    .compareCommitsWithBasehead({
                         owner,
                         repo,
-                        baseRef: (baseRef = release.data.tag_name),
-                        headRef,
-                    }),
-                () =>
-                    github
-                        .request('GET /repos/:owner/:repo/commits/:headRef', {
-                            owner,
-                            repo,
-                            headRef,
-                        })
-                        .then((response) => ({
-                            data: {
-                                commits: [response.data as ApiCommit],
-                            },
-                        })),
-            )
-            .then((response) =>
-                response.data.commits
-                    .map((commit: ApiCommit) => ({
-                        author: commit.author?.login,
-                        committer: commit.committer?.login,
-                        subject: commit.commit.message.split('\n')[0],
-                        message: commit.commit.message,
-                    }))
-                    .reverse(),
-            )
-            .then((commits) => {
-                if (commits.length === 0) {
-                    setFailed(`No commits found between refs ${baseRef}...${headRef}`)
-                    return
-                }
+                        basehead: `${baseRef}...${headRef}`,
+                    })
+                    .then((response) => response.data.commits as ApiCommit[])
+            },
+            () =>
+                github.rest.repos
+                    .getCommit({ owner, repo, ref: headRef })
+                    .then((response) => [response.data as ApiCommit]),
+        )
 
-                setOutput('release-name', commits[0].subject)
+        const mapped = commits
+            .map((commit) => ({
+                author: commit.author?.login,
+                committer: commit.committer?.login,
+                subject: commit.commit.message.split('\n')[0],
+                message: commit.commit.message,
+            }))
+            .reverse()
 
-                let releaseNotes = ''
-                for (const commit of commits) {
-                    releaseNotes += buildReleaseNote(format, commit)
-                    releaseNotes += '\n'
-                }
+        if (mapped.length === 0) {
+            setFailed(`No commits found between refs ${baseRef}...${headRef}`)
+            return
+        }
 
-                setOutput('release-notes', releaseNotes)
-            })
-            .catch((error) => setFailed(error.message))
+        setOutput('release-name', mapped[0].subject)
+
+        let releaseNotes = ''
+        for (const commit of mapped) {
+            releaseNotes += buildReleaseNote(format, commit)
+            releaseNotes += '\n'
+        }
+
+        setOutput('release-notes', releaseNotes)
     } catch (error) {
         setFailed(
             typeof error === 'string' || error instanceof Error

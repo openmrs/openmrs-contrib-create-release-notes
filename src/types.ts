@@ -9,5 +9,6 @@ export type Commit = {
     author?: string | null
     committer?: string | null
     subject: string
-    commit: string
+    message?: string
+    commit?: string
 }
