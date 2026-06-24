@@ -1,6 +1,15 @@
 name: 'create-release-notes'
 description: 'Generates release notes from commits between the latest tag and the branch HEAD.'
 inputs:
+    base-ref:
+        description: >
+            Explicit base ref/tag for the comparison (e.g. a previous release tag).
+            When provided, the action compares base-ref...head-ref directly and
+            does not call getLatestRelease. When omitted, behavior is unchanged:
+            the latest repo release is used as the base, falling back to a
+            single-commit fetch at head-ref if no releases exist.
+        required: false
+        default: ''
     head-ref:
         description: 'Custom head ref'
         required: false

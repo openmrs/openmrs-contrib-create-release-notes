@@ -160,6 +160,77 @@ describe('main', () => {
         expect((arg as Error).message).toBe('compare failed')
     })
 
+    test('uses base-ref directly and skips getLatestRelease when provided', async () => {
+        process.env.GITHUB_TOKEN = 'fake-token'
+        getInputMock.mockImplementation((name: string) => {
+            if (name === 'base-ref') return 'refs/tags/foo-1.0.0'
+            if (name === 'head-ref') return 'refs/tags/foo-1.0.1'
+            if (name === 'format') return '- {{subject}} by @{{author}}'
+            return ''
+        })
+        compareCommitsMock.mockResolvedValue({
+            data: {
+                commits: [
+                    {
+                        author: { login: 'alice' },
+                        committer: { login: 'alice' },
+                        commit: { message: 'fix bug' },
+                    },
+                ],
+            },
+        })
+
+        await runMain()
+
+        expect(getLatestReleaseMock).not.toHaveBeenCalled()
+        expect(compareCommitsMock).toHaveBeenCalledWith({
+            owner: 'test-owner',
+            repo: 'test-repo',
+            basehead: 'refs/tags/foo-1.0.0...refs/tags/foo-1.0.1',
+        })
+        expect(setOutputMock).toHaveBeenCalledWith('release-name', 'fix bug')
+        expect(setOutputMock).toHaveBeenCalledWith('release-notes', '- fix bug by @alice\n')
+        expect(setFailedMock).not.toHaveBeenCalled()
+    })
+
+    test('fails without falling back when an explicit base-ref compare rejects', async () => {
+        process.env.GITHUB_TOKEN = 'fake-token'
+        getInputMock.mockImplementation((name: string) => {
+            if (name === 'base-ref') return 'refs/tags/does-not-exist'
+            if (name === 'head-ref') return 'refs/tags/foo-1.0.1'
+            if (name === 'format') return '- {{subject}} by @{{author}}'
+            return ''
+        })
+        compareCommitsMock.mockRejectedValue(new Error('Not Found'))
+
+        await runMain()
+
+        expect(getCommitMock).not.toHaveBeenCalled()
+        expect(setFailedMock).toHaveBeenCalledWith(
+            'Failed to compare refs/tags/does-not-exist...refs/tags/foo-1.0.1: Not Found',
+        )
+        expect(setOutputMock).not.toHaveBeenCalled()
+    })
+
+    test('fails when an explicit base-ref compare returns no commits', async () => {
+        process.env.GITHUB_TOKEN = 'fake-token'
+        getInputMock.mockImplementation((name: string) => {
+            if (name === 'base-ref') return 'refs/tags/foo-1.0.0'
+            if (name === 'head-ref') return 'refs/tags/foo-1.0.1'
+            if (name === 'format') return '- {{subject}} by @{{author}}'
+            return ''
+        })
+        compareCommitsMock.mockResolvedValue({ data: { commits: [] } })
+
+        await runMain()
+
+        expect(getLatestReleaseMock).not.toHaveBeenCalled()
+        expect(setFailedMock).toHaveBeenCalledWith(
+            'No commits found between refs refs/tags/foo-1.0.0...refs/tags/foo-1.0.1',
+        )
+        expect(setOutputMock).not.toHaveBeenCalled()
+    })
+
     test('honors the format input for the release-notes output', async () => {
         process.env.GITHUB_TOKEN = 'fake-token'
         getInputMock.mockImplementation((name: string) => {
