@@ -36320,22 +36320,41 @@ async function main() {
             return;
         }
         let baseRef = '';
+        const baseRefInput = (0, core_1.getInput)('base-ref');
         const headRef = (0, core_1.getInput)('head-ref');
         const format = (0, core_1.getInput)('format');
         const github = (0, github_1.getOctokit)(process.env.GITHUB_TOKEN);
         const { owner, repo } = github_1.context.repo;
-        const commits = await github.rest.repos.getLatestRelease({ owner, repo }).then((release) => {
-            baseRef = release.data.tag_name;
-            return github.rest.repos
-                .compareCommitsWithBasehead({
-                owner,
-                repo,
-                basehead: `${baseRef}...${headRef}`,
-            })
-                .then((response) => response.data.commits);
-        }, () => github.rest.repos
-            .getCommit({ owner, repo, ref: headRef })
-            .then((response) => [response.data]));
+        const compareCommits = () => github.rest.repos
+            .compareCommitsWithBasehead({
+            owner,
+            repo,
+            basehead: `${baseRef}...${headRef}`,
+        })
+            .then((response) => response.data.commits);
+        let commits;
+        if (baseRefInput) {
+            // An explicit base ref bypasses getLatestRelease entirely so callers in
+            // multi-artifact repos or releasing from non-default branches control the
+            // comparison base. A base that doesn't resolve is a caller bug, not a
+            // signal to fall back to the single-commit path.
+            baseRef = baseRefInput;
+            try {
+                commits = await compareCommits();
+            }
+            catch (error) {
+                (0, core_1.setFailed)(`Failed to compare ${baseRef}...${headRef}: ${error instanceof Error ? error.message : String(error)}`);
+                return;
+            }
+        }
+        else {
+            commits = await github.rest.repos.getLatestRelease({ owner, repo }).then((release) => {
+                baseRef = release.data.tag_name;
+                return compareCommits();
+            }, () => github.rest.repos
+                .getCommit({ owner, repo, ref: headRef })
+                .then((response) => [response.data]));
+        }
         const mapped = commits
             .map((commit) => ({
             author: commit.author?.login,

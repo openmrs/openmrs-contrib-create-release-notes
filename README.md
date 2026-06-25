@@ -6,6 +6,21 @@ This action compiles the commits between the latest release tag and a head ref i
 
 ## Inputs
 
+### `base-ref`
+
+**Optional** Explicit base ref/tag for the comparison (e.g. a previous release tag). Default is `''`.
+
+When provided, the action compares `base-ref...head-ref` directly and does not call `getLatestRelease`. When omitted, behavior is unchanged: the latest repo release is used as the base, falling back to a single-commit fetch at `head-ref` if no releases exist.
+
+Callers in multi-artifact repos (where a single repo releases artifacts under different tag prefixes) or releasing from a non-default branch should compute and pass `base-ref` — typically from a prior step's output — because `getLatestRelease` returns the repo-wide latest release, which may belong to an unrelated artifact or branch.
+
+```yaml
+- uses: openmrs/openmrs-contrib-create-release-notes@v1
+  with:
+      head-ref: refs/tags/authentication-2.1.1
+      base-ref: refs/tags/authentication-2.1.0
+```
+
 ### `head-ref`
 
 **Optional** Custom head ref. Default is `HEAD`.
